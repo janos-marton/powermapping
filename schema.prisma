@@ -1,0 +1,90 @@
+// To move to Postgres: change `provider` to "postgresql" and set DATABASE_URL.
+// No enums or SQLite-only types are used; enum-like columns are Strings validated by zod.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Map {
+  id           String   @id @default(cuid())
+  jurisdiction String
+  issue        String
+  createdAt    DateTime @default(now())
+  actors       Actor[]
+  chatMessages ChatMessage[]
+}
+
+model Actor {
+  id               String   @id @default(cuid())
+  mapId            String
+  map              Map      @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  name             String
+  type             String
+  affiliation      String   @default("")
+  description      String   @default("")
+  currentHolder    String?
+  x                Float?
+  y                Float?
+  placedBySource   String? // "user" | "claude"
+  placedByUser     String?
+  placedAt         DateTime?
+  // JSON text: {"power": "...", "support": "..."}; set only for Claude placements
+  claudeRationale  String?
+  claudeConfidence String? // "low" | "medium" | "high"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  events           PlacementEvent[]
+  notes            Note[]
+
+  @@index([mapId])
+}
+
+model PlacementEvent {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      Actor    @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  fromX      Float?
+  fromY      Float?
+  toX        Float?
+  toY        Float?
+  source     String // "user" | "claude"
+  userName   String // "Claude" for Claude placements
+  rationale  String?
+  confidence String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId, createdAt])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  actorId   String
+  actor     Actor    @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  userName  String
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+}
+
+model ChatMessage {
+  id             String   @id @default(cuid())
+  mapId          String
+  map            Map      @relation(fields: [mapId], references: [id], onDelete: Cascade)
+  role           String // "user" | "assistant" | "system_event"
+  userName       String?
+  body           String
+  relatedActorId String?
+  createdAt      DateTime @default(now())
+
+  @@index([mapId, createdAt])
+}
+
+model UserSetting {
+  userName        String  @id
+  claudeFollowUps Boolean @default(true)
+}
